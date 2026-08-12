@@ -89,9 +89,7 @@ public class TeachersComponent {
                 .getAttribute("data-swiper-slide-index");
 
         if (index == null) {
-            throw new IllegalStateException(
-                    "У активного слайда отсутствует data-swiper-slide-index"
-            );
+            throw new IllegalStateException("У активного слайда отсутствует data-swiper-slide-index");
         }
 
         return Integer.parseInt(index);
@@ -111,21 +109,13 @@ public class TeachersComponent {
 
     public void clickTeacher(String teacherName) {
         findTeacher(teacherName).click();
-
-        page.locator(
-                "div.sc-13monb3-2.sc-1craaz7-0:has(button.sc-15oy5d9-0):visible"
-        ).first().waitFor(
-                new Locator.WaitForOptions()
-                        .setState(WaitForSelectorState.VISIBLE)
-                        .setTimeout(15_000)
-        );
+        page.locator("div.sc-13monb3-2.sc-1craaz7-0:has(button.sc-15oy5d9-0):visible")
+                .first()
+                .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15_000));
     }
 
     private Locator findTeacher(String teacherName) {
-        return teachers
-                .filter(new Locator.FilterOptions()
-                        .setHasText(teacherName))
-                .first();
+        return teachers.filter(new Locator.FilterOptions().setHasText(teacherName)).first();
     }
 }
 

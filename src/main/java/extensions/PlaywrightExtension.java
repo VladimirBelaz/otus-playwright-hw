@@ -48,33 +48,20 @@ public class PlaywrightExtension implements BeforeEachCallback, AfterEachCallbac
 
         page = browserContext.newPage();
 
-        injector = injector.createChildInjector(
-                new TestResourcesModule(
-                        browserContext,
-                        page
-                ),
-                new PageModule()
-        );
+        injector = injector.createChildInjector(new TestResourcesModule(browserContext, page), new PageModule());
 
-        injector.injectMembers(
-                context.getRequiredTestInstance()
-        );
+        injector.injectMembers(context.getRequiredTestInstance());
     }
 
     @Override
     public void afterEach(ExtensionContext context) {
         String testName = context.getRequiredTestMethod().getName();
 
-        Path tracePath = TRACE_DIRECTORY.resolve(
-                testName + ".zip"
-        );
+        Path tracePath = TRACE_DIRECTORY.resolve(testName + ".zip");
 
         try {
             if (browserContext != null) {
-                browserContext.tracing().stop(
-                        new Tracing.StopOptions()
-                                .setPath(tracePath)
-                );
+                browserContext.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
             }
         } finally {
             if (browserContext != null) {

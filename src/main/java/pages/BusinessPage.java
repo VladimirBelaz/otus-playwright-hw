@@ -14,10 +14,9 @@ public class BusinessPage {
 
     private final Page page;
 
-    // Локаторы (временные, нужно уточнить по реальному HTML)
     private final String detailsButtonSelector = "div:has-text('Не нашли нужный курс?') button:has-text('Подробнее')";
     private final String businessCoursePageTitleSelector = "h1:has-text('Разработка курса для бизнеса')";
-    private final String directionItemsSelector = ".direction-item, .sc-..."; // замените на реальный селектор
+    private final String directionItemsSelector = ".direction-item, .sc-...";
 
     @Inject
     public BusinessPage(Page page) {
@@ -25,8 +24,7 @@ public class BusinessPage {
     }
 
     public BusinessPage open() {
-        page.navigate(URL, new Page.NavigateOptions()
-                .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+        page.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
         return this;
     }
 
@@ -36,9 +34,7 @@ public class BusinessPage {
     }
 
     public void verifyBusinessCoursePageOpened() {
-        // Проверка через URL
         assertThat(page).hasURL("https://otus.ru/razrabotka-kursa-dlya-biznesa");
-        // Или проверка по тексту
         assertThat(page.locator(businessCoursePageTitleSelector)).isVisible();
     }
 
@@ -48,7 +44,6 @@ public class BusinessPage {
 
     public void verifyDirectionsDisplayed() {
         assertThat(getDirectionItems().first()).isVisible();
-        // Используем JUnit для проверки количества
         assertTrue(getDirectionItems().count() > 0);
     }
 
@@ -59,7 +54,6 @@ public class BusinessPage {
 
     public void verifyCatalogOpenedWithCategory(String categoryName) {
         assertThat(page).hasURL("https://otus.ru/catalog/courses");
-        // Проверяем, что в фильтре направления выбрана нужная категория
         Locator selectedCategory = page.locator("div:has-text('Направление') + div p");
         assertThat(selectedCategory).hasText(categoryName);
     }

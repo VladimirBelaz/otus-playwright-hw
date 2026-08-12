@@ -11,10 +11,7 @@ public class TestResourcesModule extends AbstractModule {
     private final BrowserContext browserContext;
     private final Page page;
 
-    public TestResourcesModule(
-            BrowserContext browserContext,
-            Page page
-    ) {
+    public TestResourcesModule(BrowserContext browserContext, Page page) {
         this.browserContext = browserContext;
         this.page = page;
     }
