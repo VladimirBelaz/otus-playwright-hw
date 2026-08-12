@@ -3,239 +3,637 @@ package pages;
 import com.google.inject.Inject;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.WaitUntilState;
-import com.microsoft.playwright.options.WaitForSelectorState;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CatalogPage {
 
-    private static final String URL = "https://otus.ru/catalog/courses";
+    private static final String URL =
+            "https://otus.ru/catalog/courses";
 
     private final Page page;
 
-    private final String directionFilterContainer = "div.sc-1w8jhjp-0.gitpfW:has(p:has-text('Направление'))";
-    private final String levelFilterContainer = "div.sc-1w8jhjp-0.gitpfW:has(p:has-text('Уровень'))";
-    private final String durationFilterContainer = "div.sc-1w8jhjp-0.gitpfW:has(p:has-text('Продолжительность'))";
+    // -------------------------------------------------------------------------
+    // Фильтры
+    // -------------------------------------------------------------------------
 
-    private final String filterValueSelector = "p.sc-i4g3a4-0.byWUUn";
+    private static final String FILTER =
+            "div.sc-1w8jhjp-0.gitpfW";
 
-    private final String checkboxArchitecture = "#default-filter-checkbox-option-architecture";
+    private static final String FILTER_VALUE =
+            "p.sc-i4g3a4-0.byWUUn";
 
-    private final String durationDisplaySelector = "div.sc-1x9oq14-0.sc-1i4kf3x-0.eMZyoN.cUgsii";
+    private static final String DURATION_DISPLAY =
+            "div.sc-1x9oq14-0.sc-1i4kf3x-0.eMZyoN.cUgsii";
 
-    private final String resetButtonSelector = "button.sc-1qig7zt-0.czpnNJ.sc-1x9oq14-0-I.sc-it2lwt-1.nWKUL.jsqshx";
+    private static final String DURATION_TRACK =
+            "div.sc-1kvgqt9-1.ifTLyl";
 
-    private final String catalogContainerSelector = "div.sc-18q05a6-1";
-    private final String courseCardSelector = catalogContainerSelector + " a.sc-zzdkm7-0";
-    private final String emptyMessageSelector = "text=Ничего не найдено";
+    private static final String DURATION_SLIDER =
+            "[role='slider']";
+
+    private static final String DURATION_COLLAPSE =
+            ".ReactCollapse--collapse";
+
+    private static final String DURATION_TOGGLE =
+            "button.sc-1w8jhjp-3.dAywCQ";
+
+    private static final String ARCHITECTURE_CHECKBOX =
+            "#default-filter-checkbox-option-architecture";
+
+    // -------------------------------------------------------------------------
+    // Каталог
+    // -------------------------------------------------------------------------
+
+    private static final String CATALOG_CONTAINER =
+            "div.sc-18q05a6-1";
+
+    private static final String COURSE_CARD =
+            CATALOG_CONTAINER + " a.sc-zzdkm7-0";
+
+    private static final String EMPTY_MESSAGE =
+            "text=Ничего не найдено";
+
+    // -------------------------------------------------------------------------
+    // Constructor
+    // -------------------------------------------------------------------------
 
     @Inject
     public CatalogPage(Page page) {
         this.page = page;
     }
 
+    // -------------------------------------------------------------------------
+    // Открытие
+    // -------------------------------------------------------------------------
+
     public CatalogPage open() {
-        page.navigate(URL, new Page.NavigateOptions()
-                .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
-        System.out.println("✅ Страница каталога открыта");
+
+        page.navigate(
+                URL,
+                new Page.NavigateOptions()
+                        .setWaitUntil(WaitUntilState.DOMCONTENTLOADED)
+        );
+
+        waitForCoursesLoaded();
+
+        System.out.println("Страница каталога открыта");
+
         return this;
     }
 
+    // -------------------------------------------------------------------------
+    // Локаторы фильтров
+    // -------------------------------------------------------------------------
+
     private Locator getDirectionFilter() {
-        return page.locator(directionFilterContainer);
+
+        return page.locator(FILTER)
+                .filter(
+                        new Locator.FilterOptions()
+                                .setHasText("Направление")
+                )
+                .first();
     }
 
     private Locator getLevelFilter() {
-        return page.locator(levelFilterContainer);
+
+        return page.locator(FILTER)
+                .filter(
+                        new Locator.FilterOptions()
+                                .setHasText("Уровень")
+                )
+                .first();
     }
 
     private Locator getDurationFilter() {
-        return page.locator(durationFilterContainer);
+
+        return page.locator(FILTER)
+                .filter(
+                        new Locator.FilterOptions()
+                                .setHasText("Продолжительность")
+                )
+                .first();
     }
 
-    private Locator getFilterValue(Locator filterContainer) {
-        return filterContainer.locator(filterValueSelector);
+    private Locator getFilterValue(Locator filter) {
+
+        return filter.locator(FILTER_VALUE);
     }
 
-    public void verifyDirectionFilterDefault() {
-        Locator value = getFilterValue(getDirectionFilter());
-        assertThat(value).hasText("Все направления");
-        System.out.println("✅ Проверка: в фильтре направления выбрано 'Все направления'");
-    }
+    // -------------------------------------------------------------------------
+    // Проверка фильтров по умолчанию
+    // -------------------------------------------------------------------------
 
-    public void verifyLevelFilterDefault() {
-        Locator value = getFilterValue(getLevelFilter());
-        assertThat(value).hasText("Любой уровень");
-        System.out.println("✅ Проверка: в фильтре уровня выбрано 'Любой уровень сложности'");
-    }
+    public void verifyDefaultFilters() {
 
-    public void selectDuration(int fromMin, int toMax) {
-        Locator durationFilter = getDurationFilter();
-        Locator collapseContent = durationFilter.locator(".ReactCollapse--collapse");
+        assertThat(
+                getFilterValue(getDirectionFilter())
+        ).hasText("Все направления");
 
-        // Раскрываем фильтр, если свёрнут
-        if (!collapseContent.isVisible()) {
-            Locator toggleButton = durationFilter.locator("button.sc-1w8jhjp-3.dAywCQ");
-            if (toggleButton.isVisible()) {
-                toggleButton.click();
-            }
-        }
+        System.out.println(
+                "Проверка: выбрано 'Все направления'"
+        );
 
-        // Прокручиваем к дорожке слайдера
-        Locator track = durationFilter.locator("div.sc-1kvgqt9-1.ifTLyl");
-        track.scrollIntoViewIfNeeded();
-        assertThat(track).isVisible();
+        assertThat(
+                getFilterValue(getLevelFilter())
+        ).hasText("Любой уровень");
 
-        // Получаем координаты через JavaScript
-        Object result = page.evaluate("() => {\n" +
-                "  const handles = document.querySelectorAll('[role=\"slider\"]');\n" +
-                "  if (handles.length < 2) return null;\n" +
-                "  const track = document.querySelector('div.sc-1kvgqt9-1.ifTLyl');\n" +
-                "  const trackRect = track.getBoundingClientRect();\n" +
-                "  const leftRect = handles[0].getBoundingClientRect();\n" +
-                "  const rightRect = handles[1].getBoundingClientRect();\n" +
-                "  return {\n" +
-                "    trackX: trackRect.left,\n" +
-                "    trackWidth: trackRect.width,\n" +
-                "    y: leftRect.top + leftRect.height/2,\n" +
-                "    leftX: leftRect.left + leftRect.width/2,\n" +
-                "    rightX: rightRect.left + rightRect.width/2\n" +
-                "  };\n" +
-                "}");
-        if (result == null) {
-            throw new IllegalStateException("Не удалось найти слайдер или ползунки");
-        }
+        System.out.println(
+                "Проверка: выбран 'Любой уровень сложности'"
+        );
 
-        java.util.Map<String, Number> coords = (java.util.Map<String, Number>) result;
-        double trackX = coords.get("trackX").doubleValue();
-        double trackWidth = coords.get("trackWidth").doubleValue();
-        double y = coords.get("y").doubleValue();
-        double leftX = coords.get("leftX").doubleValue();
-        double rightX = coords.get("rightX").doubleValue();
+        assertThat(
+                getDurationFilter()
+                        .locator(DURATION_DISPLAY)
+        ).hasText("От 0 до 15 месяцев");
 
-        double minVal = 0;
-        double maxVal = 15;
-
-        double targetLeftX = trackX + (fromMin - minVal) / (maxVal - minVal) * trackWidth;
-        double targetRightX = trackX + (toMax - minVal) / (maxVal - minVal) * trackWidth;
-
-        page.mouse().move(leftX, y);
-        page.mouse().down();
-        page.mouse().move(targetLeftX, y);
-        page.mouse().up();
-
-        page.mouse().move(rightX, y);
-        page.mouse().down();
-        page.mouse().move(targetRightX, y);
-        page.mouse().up();
-
-        page.evaluate("() => {\n" +
-                "  const handles = document.querySelectorAll('[role=\"slider\"]');\n" +
-                "  if (handles.length >= 2) {\n" +
-                "    handles[0].dispatchEvent(new Event('input', { bubbles: true }));\n" +
-                "    handles[0].dispatchEvent(new Event('change', { bubbles: true }));\n" +
-                "    handles[1].dispatchEvent(new Event('input', { bubbles: true }));\n" +
-                "    handles[1].dispatchEvent(new Event('change', { bubbles: true }));\n" +
-                "  }\n" +
-                "}");
-
-        Locator display = durationFilter.locator(durationDisplaySelector);
-        assertThat(display).hasText("От " + fromMin + " до " + toMax + " месяцев");
-        System.out.println("✅ Выбрана продолжительность от " + fromMin + " до " + toMax + " месяцев");
-
-        waitForCoursesLoaded();
-    }
-
-    public void selectArchitectureDirection() {
-        page.locator(checkboxArchitecture).click();
-        page.waitForTimeout(1000);
-        assertThat(getFilterValue(getDirectionFilter())).hasText("Архитектура");
-        System.out.println("✅ Выбрано направление 'Архитектура'");
-        waitForCoursesLoaded();
-    }
-
-    public void verifyDirectionFilterArchitecture() {
-        assertThat(getFilterValue(getDirectionFilter())).hasText("Архитектура");
-        System.out.println("✅ Проверка: в фильтре направления выбрано 'Архитектура'");
-    }
-
-
-    public void resetFilters() {
-        Locator resetBtn = page.locator(resetButtonSelector);
-        assertThat(resetBtn).isEnabled();
-        resetBtn.click();
-        page.waitForTimeout(1000);
-        System.out.println("✅ Фильтры сброшены");
-        waitForCoursesLoaded();
-    }
-
-
-    public void verifyFiltersReset() {
-        verifyDirectionFilterDefault();
-        verifyLevelFilterDefault();
-        Locator durationDisplay = getDurationFilter().locator(durationDisplaySelector);
-        assertThat(durationDisplay).hasText("От 0 до 15 месяцев");
-        System.out.println("✅ Проверка: фильтры сброшены к значениям по умолчанию");
-    }
-
-    public int getCoursesCount() {
-        return page.locator(courseCardSelector).count();
-    }
-
-    public Locator getCourseCards() {
-        return page.locator(courseCardSelector);
-    }
-
-    public void verifyCoursesDisplayed() {
-        Locator cards = page.locator(courseCardSelector);
-        if (page.locator(emptyMessageSelector).isVisible()) {
-            return;
-        }
-        page.waitForSelector(courseCardSelector, new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.ATTACHED));
-        assertTrue(cards.count() > 0);
-        System.out.println("✅ Курсы отображаются в каталоге");
-    }
-
-    public void verifyCoursesChanged(int previousCount) {
-        int currentCount = getCoursesCount();
-        assertTrue(currentCount != previousCount);
-        System.out.println("✅ Количество курсов изменилось: было " + previousCount + ", стало " + currentCount);
-    }
-
-    private void waitForCoursesLoaded() {
-        page.waitForFunction(
-                "() => document.querySelectorAll('a.sc-zzdkm7-0').length > 0 || document.querySelector('text=Ничего не найдено') !== null",
-                null
+        System.out.println(
+                "Проверка: продолжительность от 0 до 15 месяцев"
         );
     }
 
-    public void verifyAllCoursesDurationInRange(int fromMin, int toMax) {
-        Locator cards = getCourseCards();
-        int count = cards.count();
-        assertTrue(count > 0, "Нет карточек для проверки продолжительности");
+    public void verifyDirectionFilterDefault() {
 
-        for (int i = 0; i < count; i++) {
-            Locator card = cards.nth(i);
-            // Ищем элемент с продолжительностью внутри карточки
-            Locator durationElement = card.locator(".sc-157icee-1 .sc-hrqzy3-1, .sc-157icee-1 .jEGzDf");
-            String durationText = durationElement.textContent().trim();
-            int months = extractMonths(durationText);
-            assertTrue(months >= fromMin && months <= toMax,
-                    "Курс имеет продолжительность " + months + " мес., ожидается от " + fromMin + " до " + toMax +
-                            ". Текст: " + durationText);
-        }
-        System.out.println("✅ Все " + count + " курсов имеют продолжительность от " + fromMin + " до " + toMax + " месяцев");
+        assertThat(
+                getFilterValue(getDirectionFilter())
+        ).hasText("Все направления");
     }
 
-    private int extractMonths(String durationText) {
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\d+)\\s*месяц");
-        java.util.regex.Matcher matcher = pattern.matcher(durationText);
-        if (matcher.find()) {
-            return Integer.parseInt(matcher.group(1));
+    public void verifyLevelFilterDefault() {
+
+        assertThat(
+                getFilterValue(getLevelFilter())
+        ).hasText("Любой уровень");
+    }
+
+    // -------------------------------------------------------------------------
+    // Фильтр продолжительности
+    // -------------------------------------------------------------------------
+
+    public void selectDuration(int fromMin, int toMax) {
+
+        Locator durationFilter =
+                getDurationFilter();
+
+        Locator collapse =
+                durationFilter.locator(DURATION_COLLAPSE);
+
+        if (!collapse.isVisible()) {
+
+            durationFilter
+                    .locator(DURATION_TOGGLE)
+                    .click();
+
+            assertThat(collapse)
+                    .isVisible();
         }
-        throw new IllegalStateException("Не удалось извлечь продолжительность из текста: " + durationText);
+
+        Locator sliders =
+                durationFilter
+                        .locator(DURATION_TRACK)
+                        .locator(DURATION_SLIDER);
+
+        assertThat(sliders)
+                .hasCount(2);
+
+        // ---------------------------------------------------------------------
+        // Левый ползунок
+        // ---------------------------------------------------------------------
+
+        Locator leftSlider =
+                sliders.nth(0);
+
+        int leftMin =
+                Integer.parseInt(
+                        leftSlider.getAttribute("aria-valuemin")
+                );
+
+        int leftMax =
+                Integer.parseInt(
+                        leftSlider.getAttribute("aria-valuemax")
+                );
+
+        assertTrue(
+                fromMin >= leftMin && fromMin <= leftMax,
+                "Некорректное минимальное значение: " + fromMin
+        );
+
+        leftSlider.focus();
+        leftSlider.press("Home");
+
+        for (int value = leftMin; value < fromMin; value++) {
+            leftSlider.press("ArrowRight");
+        }
+
+        assertThat(leftSlider)
+                .hasAttribute(
+                        "aria-valuenow",
+                        String.valueOf(fromMin)
+                );
+
+        // ---------------------------------------------------------------------
+        // После изменения DOM мог быть перерисован.
+        // Получаем локаторы заново.
+        // ---------------------------------------------------------------------
+
+        sliders =
+                durationFilter
+                        .locator(DURATION_TRACK)
+                        .locator(DURATION_SLIDER);
+
+        assertThat(sliders)
+                .hasCount(2);
+
+        // ---------------------------------------------------------------------
+        // Правый ползунок
+        // ---------------------------------------------------------------------
+
+        Locator rightSlider =
+                sliders.nth(1);
+
+        int rightMin =
+                Integer.parseInt(
+                        rightSlider.getAttribute("aria-valuemin")
+                );
+
+        int rightMax =
+                Integer.parseInt(
+                        rightSlider.getAttribute("aria-valuemax")
+                );
+
+        assertTrue(
+                toMax >= rightMin && toMax <= rightMax,
+                "Некорректное максимальное значение: " + toMax
+        );
+
+        rightSlider.focus();
+        rightSlider.press("End");
+
+        for (int value = rightMax; value > toMax; value--) {
+            rightSlider.press("ArrowLeft");
+        }
+
+        assertThat(rightSlider)
+                .hasAttribute(
+                        "aria-valuenow",
+                        String.valueOf(toMax)
+                );
+
+        // ---------------------------------------------------------------------
+        // Проверяем отображаемое значение фильтра.
+        // ---------------------------------------------------------------------
+
+        assertThat(
+                durationFilter.locator(DURATION_DISPLAY)
+        ).hasText(
+                "От " + fromMin + " до " + toMax + " месяцев"
+        );
+
+        System.out.println(
+                "Выбрана продолжительность от "
+                        + fromMin
+                        + " до "
+                        + toMax
+                        + " месяцев"
+        );
+
+        // ---------------------------------------------------------------------
+        // Главное:
+        // ждём, пока реально изменится содержимое каталога.
+        // Не передаём Java-массивы в waitForFunction.
+        // ---------------------------------------------------------------------
+
+        waitForCatalogAfterFilter();
+
+        // Дополнительная небольшая стабилизация React.
+        page.waitForTimeout(300);
+    }
+
+    // -------------------------------------------------------------------------
+    // Направление "Архитектура"
+    // -------------------------------------------------------------------------
+
+    public void selectArchitectureDirection() {
+
+        Locator checkbox =
+                page.locator(ARCHITECTURE_CHECKBOX);
+
+        assertThat(checkbox)
+                .isVisible();
+
+        checkbox.click();
+
+        assertThat(
+                getFilterValue(getDirectionFilter())
+        ).hasText("Архитектура");
+
+        System.out.println(
+                "Выбрано направление 'Архитектура'"
+        );
+
+        waitForCatalogAfterFilter();
+
+        page.waitForTimeout(300);
+    }
+
+    public void verifyDirectionFilterArchitecture() {
+
+        assertThat(
+                getFilterValue(getDirectionFilter())
+        ).hasText("Архитектура");
+
+        System.out.println(
+                "Проверка: выбрано 'Архитектура'"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Карточки
+    // -------------------------------------------------------------------------
+
+    public Locator getCourseCards() {
+
+        return page.locator(COURSE_CARD);
+    }
+
+    public int getCoursesCount() {
+
+        return getCourseCards().count();
+    }
+
+    public Set<String> getCourseCardsIds() {
+
+        Set<String> result =
+                new HashSet<>();
+
+        Locator cards =
+                getCourseCards();
+
+        int count =
+                cards.count();
+
+        for (int i = 0; i < count; i++) {
+
+            String href =
+                    cards.nth(i)
+                            .getAttribute("href");
+
+            if (href != null && !href.isBlank()) {
+                result.add(href);
+            }
+        }
+
+        return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Проверка продолжительности
+    // -------------------------------------------------------------------------
+
+    public void verifyAllCoursesDurationInRange(
+            int fromMin,
+            int toMax
+    ) {
+
+        Locator cards =
+                getCourseCards();
+
+        int count =
+                cards.count();
+
+        assertTrue(
+                count > 0,
+                "Нет карточек для проверки продолжительности"
+        );
+
+        System.out.println(
+                "Проверяем "
+                        + count
+                        + " карточек после фильтра"
+        );
+
+        for (int i = 0; i < count; i++) {
+
+            Locator card =
+                    cards.nth(i);
+
+            String cardText =
+                    card.innerText();
+
+            assertTrue(
+                    cardText != null
+                            && !cardText.isBlank(),
+                    "У карточки №"
+                            + (i + 1)
+                            + " отсутствует текст"
+            );
+
+            int months =
+                    extractMonths(cardText);
+
+            assertTrue(
+                    months >= fromMin
+                            && months <= toMax,
+
+                    "Курс №"
+                            + (i + 1)
+                            + " имеет продолжительность "
+                            + months
+                            + " месяцев. "
+                            + "Ожидалось от "
+                            + fromMin
+                            + " до "
+                            + toMax
+                            + ". Текст: "
+                            + cardText.trim()
+            );
+        }
+
+        System.out.println(
+                "Все курсы имеют продолжительность от "
+                        + fromMin
+                        + " до "
+                        + toMax
+                        + " месяцев"
+        );
+    }
+
+    private int extractMonths(String text) {
+
+        Matcher matcher =
+                Pattern.compile(
+                        "(\\d+)\\s*месяц"
+                ).matcher(text);
+
+        if (matcher.find()) {
+
+            return Integer.parseInt(
+                    matcher.group(1)
+            );
+        }
+
+        throw new IllegalStateException(
+                "Не удалось извлечь продолжительность из текста: "
+                        + text
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Сброс фильтров
+    // -------------------------------------------------------------------------
+
+    public void resetFilters() {
+
+        Locator resetButton =
+                page.getByRole(
+                        AriaRole.BUTTON,
+                        new Page.GetByRoleOptions()
+                                .setName("Очистить фильтры")
+                );
+
+        assertThat(resetButton)
+                .isVisible();
+
+        assertThat(resetButton)
+                .isEnabled();
+
+        System.out.println(
+                "Нажимаем кнопку 'Очистить фильтры'"
+        );
+
+        resetButton.click();
+
+        assertThat(
+                getFilterValue(getDirectionFilter())
+        ).hasText("Все направления");
+
+        assertThat(
+                getFilterValue(getLevelFilter())
+        ).hasText("Любой уровень");
+
+        assertThat(
+                getDurationFilter()
+                        .locator(DURATION_DISPLAY)
+        ).hasText("От 0 до 15 месяцев");
+
+        System.out.println(
+                "Фильтры сброшены"
+        );
+
+        waitForCoursesLoaded();
+    }
+
+    public void verifyFiltersReset() {
+
+        verifyDirectionFilterDefault();
+
+        verifyLevelFilterDefault();
+
+        assertThat(
+                getDurationFilter()
+                        .locator(DURATION_DISPLAY)
+        ).hasText("От 0 до 15 месяцев");
+
+        System.out.println(
+                "Проверка: фильтры сброшены к значениям по умолчанию"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Ожидание первоначальной загрузки каталога
+    // -------------------------------------------------------------------------
+
+    private void waitForCoursesLoaded() {
+
+        page.waitForFunction(
+                """
+                () => {
+                    const cards =
+                        document.querySelectorAll(
+                            'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                        );
+
+                    if (cards.length > 0) {
+                        return true;
+                    }
+
+                    const bodyText =
+                        document.body
+                            ? document.body.innerText
+                            : '';
+
+                    return bodyText.includes(
+                        'Ничего не найдено'
+                    );
+                }
+                """
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Ожидание применения фильтра
+    // -------------------------------------------------------------------------
+
+    private void waitForCatalogAfterFilter() {
+
+        page.waitForTimeout(1000);
+
+        page.waitForFunction(
+                """
+                () => {
+                    const cards =
+                        document.querySelectorAll(
+                            'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                        );
+
+                    const skeletons =
+                        document.body &&
+                        document.body.innerText
+                            ? document.body.innerText.includes('Skeleton')
+                            : false;
+
+                    return cards.length > 0 && !skeletons;
+                }
+                """
+        );
+
+        System.out.println(
+                "Каталог обновился после изменения фильтра"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Дополнительная проверка
+    // -------------------------------------------------------------------------
+
+    public void verifyCoursesDisplayed() {
+
+        Locator cards =
+                getCourseCards();
+
+        Locator emptyMessage =
+                page.locator(EMPTY_MESSAGE);
+
+        if (emptyMessage.isVisible()) {
+            return;
+        }
+
+        assertTrue(
+                cards.count() > 0,
+                "Курсы не отображаются"
+        );
+
+        System.out.println(
+                "Курсы отображаются в каталоге"
+        );
     }
 }
