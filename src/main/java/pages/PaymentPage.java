@@ -7,27 +7,31 @@ import com.microsoft.playwright.options.WaitForSelectorState;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
-public class PaymentPage {
+public class PaymentPage extends BasePage {
 
-    private final Page page;
+    private static final String AUTH_MODAL_SELECTOR =
+            "div.sc-azclpt-0.sc-1alnis6-0.fade-enter-done";
 
-    private final String authModalSelector = "div.sc-azclpt-0.sc-1alnis6-0.fade-enter-done";
-    private final String closeButtonSelector = "div.sc-1alnis6-2.daSFPw";
+    private static final String CLOSE_BUTTON_SELECTOR =
+            "div.sc-1alnis6-2.daSFPw";
 
     @Inject
     public PaymentPage(Page page) {
-        this.page = page;
+        super(page);
     }
 
     public void verifyPaymentPageOpened() {
-        Locator modal = page.locator(authModalSelector);
+        Locator modal = page.locator(AUTH_MODAL_SELECTOR);
+
         assertThat(modal).isVisible();
-        System.out.println("✅ Модальное окно авторизации открыто");
     }
 
     public void closeAuthModal() {
-        page.locator(closeButtonSelector).click();
-        page.waitForSelector(authModalSelector, new Page.WaitForSelectorOptions()
+        Locator modal = page.locator(AUTH_MODAL_SELECTOR);
+
+        page.locator(CLOSE_BUTTON_SELECTOR).click();
+
+        modal.waitFor(new Locator.WaitForOptions()
                 .setState(WaitForSelectorState.HIDDEN));
     }
 }

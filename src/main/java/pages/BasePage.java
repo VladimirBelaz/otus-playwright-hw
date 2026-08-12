@@ -6,15 +6,15 @@ import config.TestConfig;
 
 public abstract class BasePage {
 
+    protected final Page page;
+
     @Inject
-    protected Page page;
+    protected BasePage(Page page) {
+        this.page = page;
+    }
 
     protected void open(String path) {
         page.navigate(TestConfig.getBaseUrl() + path);
-    }
-
-    protected void openUrl(String url) {
-        page.navigate(url);
     }
 
     protected String getCurrentUrl() {

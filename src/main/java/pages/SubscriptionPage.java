@@ -4,16 +4,13 @@ import com.google.inject.Inject;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
-import com.microsoft.playwright.options.WaitUntilState;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class SubscriptionPage {
+public class SubscriptionPage extends BasePage {
 
-    private static final String URL = "https://otus.ru/subscription";
-
-    private final Page page;
+    private static final String PATH = "/subscription";
 
     private final String subscriptionCardSelector = "div.sc-1a5myy-0.wXPNv";
     private final String detailsButtonSelector = "button.sc-1qig7zt-0.gYFcfu.sc-1a5myy-3.cFWJVr";
@@ -21,12 +18,11 @@ public class SubscriptionPage {
 
     @Inject
     public SubscriptionPage(Page page) {
-        this.page = page;
+        super(page);
     }
 
     public SubscriptionPage open() {
-        page.navigate(URL, new Page.NavigateOptions()
-                .setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+        open(PATH);
         return this;
     }
 

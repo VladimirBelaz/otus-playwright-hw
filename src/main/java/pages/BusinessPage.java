@@ -8,11 +8,9 @@ import com.microsoft.playwright.options.WaitUntilState;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class BusinessPage {
+public class BusinessPage extends BasePage {
 
-    private static final String URL = "https://otus.ru/uslugi-kompaniyam";
-
-    private final Page page;
+    private static final String PATH = "/uslugi-kompaniyam";
 
     private final String detailsButtonSelector = "div:has-text('Не нашли нужный курс?') button:has-text('Подробнее')";
     private final String businessCoursePageTitleSelector = "h1:has-text('Разработка курса для бизнеса')";
@@ -20,11 +18,11 @@ public class BusinessPage {
 
     @Inject
     public BusinessPage(Page page) {
-        this.page = page;
+        super(page);
     }
 
     public BusinessPage open() {
-        page.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+        open(PATH);
         return this;
     }
 

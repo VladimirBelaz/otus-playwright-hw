@@ -4,7 +4,6 @@ import com.google.inject.Inject;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.AriaRole;
-import com.microsoft.playwright.options.WaitUntilState;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -14,9 +13,7 @@ import java.util.regex.Pattern;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CatalogPage {
-    private static final String URL = "https://otus.ru/catalog/courses";
-    private final Page page;
+public class CatalogPage  extends BasePage {
     private static final String FILTER = "div.sc-1w8jhjp-0.gitpfW";
     private static final String FILTER_VALUE = "p.sc-i4g3a4-0.byWUUn";
     private static final String DURATION_DISPLAY = "div.sc-1x9oq14-0.sc-1i4kf3x-0.eMZyoN.cUgsii";
@@ -28,13 +25,16 @@ public class CatalogPage {
     private static final String CATALOG_CONTAINER = "div.sc-18q05a6-1";
     private static final String COURSE_CARD = CATALOG_CONTAINER + " a.sc-zzdkm7-0";
     private static final String EMPTY_MESSAGE = "text=Ничего не найдено";
+
+    private static final String PATH = "/catalog/courses";
+
     @Inject
     public CatalogPage(Page page) {
-        this.page = page;
+        super(page);
     }
 
     public CatalogPage open() {
-        page.navigate(URL, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+        open(PATH);
         waitForCoursesLoaded();
         System.out.println("Страница каталога открыта");
         return this;
