@@ -22,15 +22,15 @@ class Scenario1Test {
     void shouldScrollTeachersAndVerifyTeacherPopup() {
         clickHousePage.open();
 
-        assertTrue(clickHousePage.teachers().isDisplayed(),"Секция 'Преподаватели' не отображается");
+        assertTrue(clickHousePage.teachers().isDisplayed(), "Секция 'Преподаватели' не отображается");
 
-        assertTrue(clickHousePage.teachers().getTeachersCount() > 0,"В секции 'Преподаватели' нет преподавателей");
+        assertTrue(clickHousePage.teachers().getTeachersCount() > 0, "В секции 'Преподаватели' нет преподавателей");
 
         int previousIndex = clickHousePage.teachers().getActiveSlideIndex();
 
         clickHousePage.teachers().dragToNextTeacher();
 
-        assertTrue(clickHousePage.teachers().hasActiveSlideChanged(previousIndex),"Список преподавателей не прокрутился после drag");
+        assertTrue(clickHousePage.teachers().hasActiveSlideChanged(previousIndex), "Список преподавателей не прокрутился после drag");
 
         String activeTeacherName = clickHousePage.teachers().getActiveTeacherName();
 
@@ -40,7 +40,7 @@ class Scenario1Test {
 
         popup.waitForOpen();
 
-        assertEquals(activeTeacherName, popup.getTeacherName(),"Открыт popup другого преподавателя");
+        assertEquals(activeTeacherName, popup.getTeacherName(), "Открыт popup другого преподавателя");
 
         String firstPopupTeacherName = popup.getTeacherName();
 
@@ -56,6 +56,6 @@ class Scenario1Test {
 
         popup.close();
 
-        assertFalse(popup.isOpen(),"Popup не закрылся");
+        assertFalse(popup.isOpen(), "Popup не закрылся");
     }
 }

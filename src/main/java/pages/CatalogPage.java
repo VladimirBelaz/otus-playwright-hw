@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CatalogPage  extends BasePage {
+public class CatalogPage extends BasePage {
     private static final String FILTER = "div.sc-1w8jhjp-0.gitpfW";
     private static final String FILTER_VALUE = "p.sc-i4g3a4-0.byWUUn";
     private static final String DURATION_DISPLAY = "div.sc-1x9oq14-0.sc-1i4kf3x-0.eMZyoN.cUgsii";
@@ -88,7 +88,7 @@ public class CatalogPage  extends BasePage {
         Locator leftSlider = sliders.nth(0);
         int leftMin = Integer.parseInt(leftSlider.getAttribute("aria-valuemin"));
         int leftMax = Integer.parseInt(leftSlider.getAttribute("aria-valuemax"));
-        assertTrue(fromMin >= leftMin && fromMin <= leftMax,"Некорректное минимальное значение: " + fromMin);
+        assertTrue(fromMin >= leftMin && fromMin <= leftMax, "Некорректное минимальное значение: " + fromMin);
 
         leftSlider.focus();
         leftSlider.press("Home");
@@ -112,11 +112,11 @@ public class CatalogPage  extends BasePage {
             rightSlider.press("ArrowLeft");
         }
 
-        assertThat(rightSlider).hasAttribute("aria-valuenow",String.valueOf(toMax));
+        assertThat(rightSlider).hasAttribute("aria-valuenow", String.valueOf(toMax));
 
         assertThat(durationFilter.locator(DURATION_DISPLAY)).hasText("От " + fromMin + " до " + toMax + " месяцев");
 
-        System.out.println("Выбрана продолжительность от "+ fromMin + " до " + toMax + " месяцев");
+        System.out.println("Выбрана продолжительность от " + fromMin + " до " + toMax + " месяцев");
 
         waitForCatalogAfterFilter();
         page.waitForTimeout(300);
@@ -157,7 +157,9 @@ public class CatalogPage  extends BasePage {
         for (int i = 0; i < count; i++) {
             String href = cards.nth(i).getAttribute("href");
 
-            if (href != null && !href.isBlank()) {result.add(href);}
+            if (href != null && !href.isBlank()) {
+                result.add(href);
+            }
         }
         return result;
     }
@@ -172,24 +174,13 @@ public class CatalogPage  extends BasePage {
             Locator card = cards.nth(i);
             String cardText = card.innerText();
             assertTrue(cardText != null && !cardText.isBlank(),
-                    "У карточки №"
-                            + (i + 1)
-                            + " отсутствует текст"
+                    "У карточки №" + (i + 1) + " отсутствует текст"
             );
 
             int months = extractMonths(cardText);
             assertTrue(months >= fromMin && months <= toMax,
-                    "Курс №"
-                            + (i + 1)
-                            + " имеет продолжительность "
-                            + months
-                            + " месяцев. "
-                            + "Ожидалось от "
-                            + fromMin
-                            + " до "
-                            + toMax
-                            + ". Текст: "
-                            + cardText.trim()
+                    "Курс №" + (i + 1) + " имеет продолжительность " + months + " месяцев. " +
+                            "Ожидалось от " + fromMin + " до " + toMax + ". Текст: " + cardText.trim()
             );
         }
         System.out.println("Все курсы имеют продолжительность от " + fromMin + " до " + toMax + " месяцев");
@@ -228,26 +219,26 @@ public class CatalogPage  extends BasePage {
     private void waitForCoursesLoaded() {
         page.waitForFunction(
                 """
-                () => {
-                    const cards =
-                        document.querySelectorAll(
-                            'div.sc-18q05a6-1 a.sc-zzdkm7-0'
-                        );
-
-                    if (cards.length > 0) {
-                        return true;
-                    }
-
-                    const bodyText =
-                        document.body
-                            ? document.body.innerText
-                            : '';
-
-                    return bodyText.includes(
-                        'Ничего не найдено'
-                    );
-                }
-                """
+                        () => {
+                            const cards =
+                                document.querySelectorAll(
+                                    'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                                );
+                        
+                            if (cards.length > 0) {
+                                return true;
+                            }
+                        
+                            const bodyText =
+                                document.body
+                                    ? document.body.innerText
+                                    : '';
+                        
+                            return bodyText.includes(
+                                'Ничего не найдено'
+                            );
+                        }
+                        """
         );
     }
 
@@ -255,21 +246,21 @@ public class CatalogPage  extends BasePage {
         page.waitForTimeout(1000);
         page.waitForFunction(
                 """
-                () => {
-                    const cards =
-                        document.querySelectorAll(
-                            'div.sc-18q05a6-1 a.sc-zzdkm7-0'
-                        );
-
-                    const skeletons =
-                        document.body &&
-                        document.body.innerText
-                            ? document.body.innerText.includes('Skeleton')
-                            : false;
-
-                    return cards.length > 0 && !skeletons;
-                }
-                """
+                        () => {
+                            const cards =
+                                document.querySelectorAll(
+                                    'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                                );
+                        
+                            const skeletons =
+                                document.body &&
+                                document.body.innerText
+                                    ? document.body.innerText.includes('Skeleton')
+                                    : false;
+                        
+                            return cards.length > 0 && !skeletons;
+                        }
+                        """
         );
         System.out.println("Каталог обновился после изменения фильтра");
     }
@@ -284,5 +275,9 @@ public class CatalogPage  extends BasePage {
         assertTrue(cards.count() > 0, "Курсы не отображаются");
 
         System.out.println("Курсы отображаются в каталоге");
+    }
+
+    public Locator getDirectionFilterValue() {
+        return getFilterValue(getDirectionFilter());
     }
 }

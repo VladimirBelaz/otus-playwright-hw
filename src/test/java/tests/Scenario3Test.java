@@ -5,6 +5,9 @@ import extensions.PlaywrightExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import pages.BusinessPage;
+import pages.CatalogPage;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 
 @ExtendWith(PlaywrightExtension.class)
 public class Scenario3Test {
@@ -13,19 +16,12 @@ public class Scenario3Test {
     private BusinessPage businessPage;
 
     @Test
-    void shouldOpenBusinessCoursePageAndNavigateToCatalog() {
+    void shouldOpenBusinessPageAndNavigateToCatalogAndCheckAllDirectionsFilter() {
         businessPage.open();
 
-        businessPage.clickDetailsButton();
+        CatalogPage catalogPage = businessPage.clickCatalogLink();
 
-        businessPage.verifyBusinessCoursePageOpened();
-
-        businessPage.verifyDirectionsDisplayed();
-
-        String firstDirectionName = businessPage.getDirectionItems().first().textContent().trim();
-
-        businessPage.clickFirstDirection();
-
-        businessPage.verifyCatalogOpenedWithCategory(firstDirectionName);
+        assertThat(catalogPage.getDirectionFilterValue()).hasText("Все направления");
+        System.out.println("Фильтр 'Все направления' выбран");
     }
 }

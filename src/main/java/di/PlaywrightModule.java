@@ -19,18 +19,26 @@ public class PlaywrightModule extends AbstractModule {
     @Provides
     @Singleton
     public Browser provideBrowser(Playwright playwright) {
-        BrowserType browserType = switch (TestConfig.getBrowser().toLowerCase()) {
-            case "chromium" -> playwright.chromium();
-            case "firefox" -> playwright.firefox();
-            case "webkit" -> playwright.webkit();
-            default -> throw new IllegalArgumentException(
-                    "Unsupported browser: " + TestConfig.getBrowser()
-            );
-        };
-
+        BrowserType browserType = getBrowserType(playwright);
         return browserType.launch(
                 new BrowserType.LaunchOptions()
                         .setHeadless(TestConfig.isHeadless())
+        );
+    }
+
+    private BrowserType getBrowserType(Playwright playwright) {
+        String browserName = TestConfig.getBrowser().toLowerCase();
+        if ("chromium".equals(browserName)) {
+            return playwright.chromium();
+        }
+        if ("firefox".equals(browserName)) {
+            return playwright.firefox();
+        }
+        if ("webkit".equals(browserName)) {
+            return playwright.webkit();
+        }
+        throw new IllegalArgumentException(
+                "Unsupported browser: " + TestConfig.getBrowser()
         );
     }
 }

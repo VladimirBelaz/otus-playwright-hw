@@ -18,7 +18,6 @@ public class PageModule extends AbstractModule {
         bind(ClickHousePage.class);
         bind(PaymentPage.class);
         bind(SubscriptionPage.class);
-
         bind(TeacherPopup.class);
         bind(TeachersComponent.class);
     }

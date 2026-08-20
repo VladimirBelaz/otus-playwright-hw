@@ -18,23 +18,23 @@ public class Scenario4Test {
         subscriptionPage.open();
 
         subscriptionPage.verifySubscriptionCardsDisplayed();
-        System.out.println("✅ Варианты подписки отображаются");
+        System.out.println("Варианты подписки отображаются");
 
         subscriptionPage.clickDetailsButton();
         subscriptionPage.verifyDescriptionExpanded();
-        System.out.println("✅ Описание развернуто");
+        System.out.println("Описание развернуто");
 
         subscriptionPage.clickDetailsButton();
         subscriptionPage.verifyDescriptionCollapsed();
-        System.out.println("✅ Описание свернуто");
+        System.out.println("Описание свернуто");
 
         PaymentPage paymentPage = subscriptionPage.clickBuyButton();
-        System.out.println("✅ Переход на страницу оплаты (модальное окно)");
+        System.out.println("Переход на страницу оплаты (модальное окно)");
 
         paymentPage.verifyPaymentPageOpened();
-        System.out.println("✅ Модальное окно открыто");
+        System.out.println("Модальное окно открыто");
 
         paymentPage.closeAuthModal();
-        System.out.println("✅ Модальное окно закрыто");
+        System.out.println("Модальное окно закрыто");
     }
 }

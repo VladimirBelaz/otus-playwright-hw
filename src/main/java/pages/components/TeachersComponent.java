@@ -1,8 +1,8 @@
 package pages.components;
 
 import com.google.inject.Inject;
-import com.microsoft.playwright.Mouse;
 import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Mouse;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.WaitForSelectorState;
 
@@ -67,17 +67,13 @@ public class TeachersComponent {
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
 
-        double startX = activeSlide.boundingBox().x
-                + activeSlide.boundingBox().width / 2;
-
-        double startY = activeSlide.boundingBox().y
-                + activeSlide.boundingBox().height / 2;
+        double startX = activeSlide.boundingBox().x + activeSlide.boundingBox().width / 2;
+        double startY = activeSlide.boundingBox().y + activeSlide.boundingBox().height / 2;
 
         page.mouse().move(startX, startY);
         page.mouse().down();
 
-        page.mouse().move(startX - 350, startY, new Mouse.MoveOptions()
-                .setSteps(10));
+        page.mouse().move(startX - 350, startY, new Mouse.MoveOptions().setSteps(10));
 
         page.mouse().up();
 

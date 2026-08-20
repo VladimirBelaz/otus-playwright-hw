@@ -35,13 +35,13 @@ public class Scenario2Test {
 
         catalogPage.verifyAllCoursesDurationInRange(3, 10);
 
-        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После применения двух фильтров каталог пуст"        );
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После применения двух фильтров каталог пуст");
 
         catalogPage.resetFilters();
 
         catalogPage.verifyFiltersReset();
 
-        assertFalse(catalogPage.getCourseCardsIds().isEmpty(),"После сброса фильтров каталог пуст"
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После сброса фильтров каталог пуст"
         );
     }
 }

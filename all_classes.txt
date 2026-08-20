@@ -1,0 +1,1107 @@
+﻿=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\test.java ===
+        String url = TestConfig.getBaseUrl() + path;
+        page.goto(url);
+    }
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\config\TestConfig.java ===
+package config;
+
+public final class TestConfig {
+
+    private static final String BASE_URL_PROPERTY = "base.url";
+    private static final String BROWSER_PROPERTY = "browser";
+    private static final String HEADLESS_PROPERTY = "headless";
+
+    private static final String DEFAULT_BASE_URL = "https://otus.ru";
+    private static final String DEFAULT_BROWSER = "chromium";
+
+    private TestConfig() {
+    }
+
+    public static String getBaseUrl() {
+        return System.getProperty(BASE_URL_PROPERTY, DEFAULT_BASE_URL);
+    }
+
+    public static String getBrowser() {
+        return System.getProperty(BROWSER_PROPERTY, DEFAULT_BROWSER);
+    }
+
+    public static boolean isHeadless() {
+        return Boolean.parseBoolean(
+                System.getProperty(HEADLESS_PROPERTY, "false")
+        );
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\di\PageModule.java ===
+package di;
+
+import com.google.inject.AbstractModule;
+import pages.BusinessPage;
+import pages.CatalogPage;
+import pages.ClickHousePage;
+import pages.PaymentPage;
+import pages.SubscriptionPage;
+import pages.components.TeacherPopup;
+import pages.components.TeachersComponent;
+
+public class PageModule extends AbstractModule {
+
+    @Override
+    protected void configure() {
+        bind(BusinessPage.class);
+        bind(CatalogPage.class);
+        bind(ClickHousePage.class);
+        bind(PaymentPage.class);
+        bind(SubscriptionPage.class);
+
+        bind(TeacherPopup.class);
+        bind(TeachersComponent.class);
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\di\PlaywrightModule.java ===
+package di;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Playwright;
+import config.TestConfig;
+
+public class PlaywrightModule extends AbstractModule {
+
+    @Provides
+    @Singleton
+    public Playwright providePlaywright() {
+        return Playwright.create();
+    }
+
+    @Provides
+    @Singleton
+    public Browser provideBrowser(Playwright playwright) {
+        BrowserType browserType = switch (TestConfig.getBrowser().toLowerCase()) {
+            case "chromium" -> playwright.chromium();
+            case "firefox" -> playwright.firefox();
+            case "webkit" -> playwright.webkit();
+            default -> throw new IllegalArgumentException(
+                    "Unsupported browser: " + TestConfig.getBrowser()
+            );
+        };
+
+        return browserType.launch(
+                new BrowserType.LaunchOptions()
+                        .setHeadless(TestConfig.isHeadless())
+        );
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\di\TestResourcesModule.java ===
+package di;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Page;
+
+public class TestResourcesModule extends AbstractModule {
+
+    private final BrowserContext browserContext;
+    private final Page page;
+
+    public TestResourcesModule(BrowserContext browserContext, Page page) {
+        this.browserContext = browserContext;
+        this.page = page;
+    }
+
+    @Provides
+    @Singleton
+    public BrowserContext provideBrowserContext() {
+        return browserContext;
+    }
+
+    @Provides
+    @Singleton
+    public Page providePage() {
+        return page;
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\extensions\PlaywrightExtension.java ===
+package extensions;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Tracing;
+import di.PageModule;
+import di.PlaywrightModule;
+import di.TestResourcesModule;
+import org.junit.jupiter.api.extension.AfterEachCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
+import org.junit.jupiter.api.extension.ExtensionContext;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class PlaywrightExtension implements BeforeEachCallback, AfterEachCallback {
+
+    private static final Path TRACE_DIRECTORY = Path.of("traces");
+
+    private Injector injector;
+    private Playwright playwright;
+    private Browser browser;
+    private BrowserContext browserContext;
+    private Page page;
+
+    @Override
+    public void beforeEach(ExtensionContext context) throws Exception {
+        Files.createDirectories(TRACE_DIRECTORY);
+
+        injector = Guice.createInjector(
+                new PlaywrightModule()
+        );
+
+        playwright = injector.getInstance(Playwright.class);
+        browser = injector.getInstance(Browser.class);
+
+        browserContext = browser.newContext();
+
+        browserContext.tracing().start(
+                new Tracing.StartOptions()
+                        .setScreenshots(true)
+                        .setSnapshots(true)
+                        .setSources(true)
+        );
+
+        page = browserContext.newPage();
+
+        injector = injector.createChildInjector(new TestResourcesModule(browserContext, page), new PageModule());
+
+        injector.injectMembers(context.getRequiredTestInstance());
+    }
+
+    @Override
+    public void afterEach(ExtensionContext context) {
+        String testName = context.getRequiredTestMethod().getName();
+
+        Path tracePath = TRACE_DIRECTORY.resolve(testName + ".zip");
+
+        try {
+            if (browserContext != null) {
+                browserContext.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
+            }
+        } finally {
+            if (browserContext != null) {
+                browserContext.close();
+            }
+
+            if (browser != null) {
+                browser.close();
+            }
+
+            if (playwright != null) {
+                playwright.close();
+            }
+        }
+    }
+
+    public Injector getInjector() {
+        return injector;
+    }
+
+    public Playwright getPlaywright() {
+        return playwright;
+    }
+
+    public Browser getBrowser() {
+        return browser;
+    }
+
+    public BrowserContext getBrowserContext() {
+        return browserContext;
+    }
+
+    public Page getPage() {
+        return page;
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\BasePage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Page;
+import config.TestConfig;
+
+public abstract class BasePage {
+
+    protected final Page page;
+
+    @Inject
+    protected BasePage(Page page) {
+        this.page = page;
+    }
+
+    protected void open(String path) {
+        page.navigate(TestConfig.getBaseUrl() + path);
+    }
+
+    protected String getCurrentUrl() {
+        return page.url();
+    }
+
+    protected String getPageTitle() {
+        return page.title();
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\BusinessPage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Page;
+
+public class BusinessPage extends BasePage {
+
+    private static final String PATH = "/b2b";
+    private final String catalogLinkSelector = "a[href='/catalog/courses']:has-text('Каталог курсов')";
+
+    @Inject
+    public BusinessPage(Page page) {
+        super(page);
+    }
+
+    public BusinessPage open() {
+        open(PATH);
+        return this;
+    }
+
+    public CatalogPage clickCatalogLink() {
+        // Клик по ссылке открывает новую вкладку — переключаемся на неё
+        Page newPage = page.context().waitForPage(() -> {
+            page.locator(catalogLinkSelector).click();
+        });
+        newPage.waitForURL("**/catalog/courses");
+        return new CatalogPage(newPage);
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\CatalogPage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.AriaRole;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class CatalogPage extends BasePage {
+    private static final String FILTER = "div.sc-1w8jhjp-0.gitpfW";
+    private static final String FILTER_VALUE = "p.sc-i4g3a4-0.byWUUn";
+    private static final String DURATION_DISPLAY = "div.sc-1x9oq14-0.sc-1i4kf3x-0.eMZyoN.cUgsii";
+    private static final String DURATION_TRACK = "div.sc-1kvgqt9-1.ifTLyl";
+    private static final String DURATION_SLIDER = "[role='slider']";
+    private static final String DURATION_COLLAPSE = ".ReactCollapse--collapse";
+    private static final String DURATION_TOGGLE = "button.sc-1w8jhjp-3.dAywCQ";
+    private static final String ARCHITECTURE_CHECKBOX = "#default-filter-checkbox-option-architecture";
+    private static final String CATALOG_CONTAINER = "div.sc-18q05a6-1";
+    private static final String COURSE_CARD = CATALOG_CONTAINER + " a.sc-zzdkm7-0";
+    private static final String EMPTY_MESSAGE = "text=Ничего не найдено";
+
+    private static final String PATH = "/catalog/courses";
+
+    @Inject
+    public CatalogPage(Page page) {
+        super(page);
+    }
+
+    public CatalogPage open() {
+        open(PATH);
+        waitForCoursesLoaded();
+        System.out.println("Страница каталога открыта");
+        return this;
+    }
+
+    private Locator getDirectionFilter() {
+        return page.locator(FILTER).filter(new Locator.FilterOptions().setHasText("Направление")).first();
+    }
+
+    private Locator getLevelFilter() {
+        return page.locator(FILTER).filter(new Locator.FilterOptions().setHasText("Уровень")).first();
+    }
+
+    private Locator getDurationFilter() {
+        return page.locator(FILTER).filter(new Locator.FilterOptions().setHasText("Продолжительность")).first();
+    }
+
+    private Locator getFilterValue(Locator filter) {
+        return filter.locator(FILTER_VALUE);
+    }
+
+    public void verifyDefaultFilters() {
+        assertThat(getFilterValue(getDirectionFilter())).hasText("Все направления");
+        System.out.println("Проверка: выбрано 'Все направления'");
+        assertThat(getFilterValue(getLevelFilter())).hasText("Любой уровень");
+        System.out.println("Проверка: выбран 'Любой уровень сложности'");
+        assertThat(getDurationFilter().locator(DURATION_DISPLAY)).hasText("От 0 до 15 месяцев");
+        System.out.println("Проверка: продолжительность от 0 до 15 месяцев");
+    }
+
+    public void verifyDirectionFilterDefault() {
+        assertThat(getFilterValue(getDirectionFilter())).hasText("Все направления");
+    }
+
+    public void verifyLevelFilterDefault() {
+        assertThat(getFilterValue(getLevelFilter())).hasText("Любой уровень");
+    }
+
+    public void selectDuration(int fromMin, int toMax) {
+        Locator durationFilter = getDurationFilter();
+        Locator collapse = durationFilter.locator(DURATION_COLLAPSE);
+
+        if (!collapse.isVisible()) {
+            durationFilter.locator(DURATION_TOGGLE).click();
+            assertThat(collapse).isVisible();
+        }
+
+        Locator sliders = durationFilter.locator(DURATION_TRACK).locator(DURATION_SLIDER);
+        assertThat(sliders).hasCount(2);
+
+        Locator leftSlider = sliders.nth(0);
+        int leftMin = Integer.parseInt(leftSlider.getAttribute("aria-valuemin"));
+        int leftMax = Integer.parseInt(leftSlider.getAttribute("aria-valuemax"));
+        assertTrue(fromMin >= leftMin && fromMin <= leftMax, "Некорректное минимальное значение: " + fromMin);
+
+        leftSlider.focus();
+        leftSlider.press("Home");
+        for (int value = leftMin; value < fromMin; value++) {
+            leftSlider.press("ArrowRight");
+        }
+        assertThat(leftSlider).hasAttribute("aria-valuenow", String.valueOf(fromMin));
+
+        sliders = durationFilter.locator(DURATION_TRACK).locator(DURATION_SLIDER);
+        assertThat(sliders).hasCount(2);
+
+        Locator rightSlider = sliders.nth(1);
+        int rightMin = Integer.parseInt(rightSlider.getAttribute("aria-valuemin"));
+        int rightMax = Integer.parseInt(rightSlider.getAttribute("aria-valuemax"));
+        assertTrue(toMax >= rightMin && toMax <= rightMax, "Некорректное максимальное значение: " + toMax);
+
+        rightSlider.focus();
+        rightSlider.press("End");
+
+        for (int value = rightMax; value > toMax; value--) {
+            rightSlider.press("ArrowLeft");
+        }
+
+        assertThat(rightSlider).hasAttribute("aria-valuenow", String.valueOf(toMax));
+
+        assertThat(durationFilter.locator(DURATION_DISPLAY)).hasText("От " + fromMin + " до " + toMax + " месяцев");
+
+        System.out.println("Выбрана продолжительность от " + fromMin + " до " + toMax + " месяцев");
+
+        waitForCatalogAfterFilter();
+        page.waitForTimeout(300);
+    }
+
+
+    public void selectArchitectureDirection() {
+        Locator checkbox = page.locator(ARCHITECTURE_CHECKBOX);
+        assertThat(checkbox).isVisible();
+
+        checkbox.click();
+        assertThat(getFilterValue(getDirectionFilter())).hasText("Архитектура");
+
+        System.out.println("Выбрано направление 'Архитектура'");
+
+        waitForCatalogAfterFilter();
+        page.waitForTimeout(300);
+    }
+
+    public void verifyDirectionFilterArchitecture() {
+        assertThat(getFilterValue(getDirectionFilter())).hasText("Архитектура");
+        System.out.println("Проверка: выбрано 'Архитектура'");
+    }
+
+
+    public Locator getCourseCards() {
+        return page.locator(COURSE_CARD);
+    }
+
+    public int getCoursesCount() {
+        return getCourseCards().count();
+    }
+
+    public Set<String> getCourseCardsIds() {
+        Set<String> result = new HashSet<>();
+        Locator cards = getCourseCards();
+        int count = cards.count();
+        for (int i = 0; i < count; i++) {
+            String href = cards.nth(i).getAttribute("href");
+
+            if (href != null && !href.isBlank()) {
+                result.add(href);
+            }
+        }
+        return result;
+    }
+
+    public void verifyAllCoursesDurationInRange(int fromMin, int toMax) {
+        Locator cards = getCourseCards();
+        int count = cards.count();
+        assertTrue(count > 0, "Нет карточек для проверки продолжительности");
+        System.out.println("Проверяем " + count + " карточек после фильтра");
+
+        for (int i = 0; i < count; i++) {
+            Locator card = cards.nth(i);
+            String cardText = card.innerText();
+            assertTrue(cardText != null && !cardText.isBlank(),
+                    "У карточки №" + (i + 1) + " отсутствует текст"
+            );
+
+            int months = extractMonths(cardText);
+            assertTrue(months >= fromMin && months <= toMax,
+                    "Курс №" + (i + 1) + " имеет продолжительность " + months + " месяцев. " +
+                            "Ожидалось от " + fromMin + " до " + toMax + ". Текст: " + cardText.trim()
+            );
+        }
+        System.out.println("Все курсы имеют продолжительность от " + fromMin + " до " + toMax + " месяцев");
+    }
+
+    private int extractMonths(String text) {
+        Matcher matcher = Pattern.compile("(\\d+)\\s*месяц").matcher(text);
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        throw new IllegalStateException("Не удалось извлечь продолжительность из текста: " + text);
+    }
+
+    public void resetFilters() {
+        Locator resetButton = page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Очистить фильтры"));
+        assertThat(resetButton).isVisible();
+        assertThat(resetButton).isEnabled();
+        System.out.println("Нажимаем кнопку 'Очистить фильтры'");
+
+        resetButton.click();
+        assertThat(getFilterValue(getDirectionFilter())).hasText("Все направления");
+        assertThat(getFilterValue(getLevelFilter())).hasText("Любой уровень");
+        assertThat(getDurationFilter().locator(DURATION_DISPLAY)).hasText("От 0 до 15 месяцев");
+        System.out.println("Фильтры сброшены");
+
+        waitForCoursesLoaded();
+    }
+
+    public void verifyFiltersReset() {
+        verifyDirectionFilterDefault();
+        verifyLevelFilterDefault();
+        assertThat(getDurationFilter().locator(DURATION_DISPLAY)).hasText("От 0 до 15 месяцев");
+        System.out.println("Проверка: фильтры сброшены к значениям по умолчанию");
+    }
+
+    private void waitForCoursesLoaded() {
+        page.waitForFunction(
+                """
+                        () => {
+                            const cards =
+                                document.querySelectorAll(
+                                    'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                                );
+                        
+                            if (cards.length > 0) {
+                                return true;
+                            }
+                        
+                            const bodyText =
+                                document.body
+                                    ? document.body.innerText
+                                    : '';
+                        
+                            return bodyText.includes(
+                                'Ничего не найдено'
+                            );
+                        }
+                        """
+        );
+    }
+
+    private void waitForCatalogAfterFilter() {
+        page.waitForTimeout(1000);
+        page.waitForFunction(
+                """
+                        () => {
+                            const cards =
+                                document.querySelectorAll(
+                                    'div.sc-18q05a6-1 a.sc-zzdkm7-0'
+                                );
+                        
+                            const skeletons =
+                                document.body &&
+                                document.body.innerText
+                                    ? document.body.innerText.includes('Skeleton')
+                                    : false;
+                        
+                            return cards.length > 0 && !skeletons;
+                        }
+                        """
+        );
+        System.out.println("Каталог обновился после изменения фильтра");
+    }
+
+    public void verifyCoursesDisplayed() {
+        Locator cards = getCourseCards();
+        Locator emptyMessage = page.locator(EMPTY_MESSAGE);
+        if (emptyMessage.isVisible()) {
+            return;
+        }
+
+        assertTrue(cards.count() > 0, "Курсы не отображаются");
+
+        System.out.println("Курсы отображаются в каталоге");
+    }
+
+    public Locator getDirectionFilterValue() {
+        return getFilterValue(getDirectionFilter());
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\ClickHousePage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Page;
+import pages.components.TeacherPopup;
+import pages.components.TeachersComponent;
+
+public class ClickHousePage extends BasePage {
+
+    private static final String PATH = "/lessons/clickhouse/";
+
+    private final TeachersComponent teachersComponent;
+    private final TeacherPopup teacherPopup;
+
+    @Inject
+    public ClickHousePage(Page page, TeachersComponent teachersComponent, TeacherPopup teacherPopup) {
+        super(page);
+        this.teachersComponent = teachersComponent;
+        this.teacherPopup = teacherPopup;
+    }
+
+    public ClickHousePage open() {
+        open(PATH);
+        return this;
+    }
+
+    public String getUrl() {
+        return getCurrentUrl();
+    }
+
+    public TeachersComponent teachers() {
+        return teachersComponent;
+    }
+
+    public TeacherPopup popup() {
+        return teacherPopup;
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\PaymentPage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+
+public class PaymentPage extends BasePage {
+
+    private static final String AUTH_MODAL_SELECTOR =
+            "div.sc-azclpt-0.sc-1alnis6-0.fade-enter-done";
+
+    private static final String CLOSE_BUTTON_SELECTOR =
+            "div.sc-1alnis6-2.daSFPw";
+
+    @Inject
+    public PaymentPage(Page page) {
+        super(page);
+    }
+
+    public void verifyPaymentPageOpened() {
+        Locator modal = page.locator(AUTH_MODAL_SELECTOR);
+
+        assertThat(modal).isVisible();
+    }
+
+    public void closeAuthModal() {
+        Locator modal = page.locator(AUTH_MODAL_SELECTOR);
+
+        page.locator(CLOSE_BUTTON_SELECTOR).click();
+
+        modal.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.HIDDEN));
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\SubscriptionPage.java ===
+package pages;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class SubscriptionPage extends BasePage {
+
+    private static final String PATH = "/subscription";
+
+    private final String subscriptionCardSelector = "div.sc-1a5myy-0.wXPNv";
+    private final String detailsButtonSelector = "button.sc-1qig7zt-0.gYFcfu.sc-1a5myy-3.cFWJVr";
+    private final String buyButtonSelector = "button.sc-1qig7zt-0.czpnNJ.sc-56aorr-7.ebCtsq:has-text('Купить')";
+
+    @Inject
+    public SubscriptionPage(Page page) {
+        super(page);
+    }
+
+    public SubscriptionPage open() {
+        open(PATH);
+        return this;
+    }
+
+    public Locator getSubscriptionCards() {
+        return page.locator(subscriptionCardSelector);
+    }
+
+    public void verifySubscriptionCardsDisplayed() {
+        assertThat(getSubscriptionCards().first()).isVisible();
+        assertTrue(getSubscriptionCards().count() > 0);
+    }
+
+    public Locator getDetailsButtonOnFirstCard() {
+        return getSubscriptionCards().first().locator(detailsButtonSelector).nth(1);
+    }
+
+    public Locator getBuyButtonOnFirstCard() {
+        return getSubscriptionCards().first().locator(buyButtonSelector);
+    }
+
+    public void clickDetailsButton() {
+        getDetailsButtonOnFirstCard().click();
+        page.waitForTimeout(300);
+    }
+
+    public void verifyDescriptionExpanded() {
+        assertThat(getDetailsButtonOnFirstCard()).hasText("Свернуть");
+    }
+
+    public void verifyDescriptionCollapsed() {
+        assertThat(getDetailsButtonOnFirstCard()).hasText("Подробнее");
+    }
+
+    public PaymentPage clickBuyButton() {
+        Locator buyButton = getBuyButtonOnFirstCard();
+        assertThat(buyButton).isEnabled();
+
+        buyButton.click();
+        page.waitForSelector("div.sc-azclpt-0.sc-1alnis6-0.fade-enter-done",
+                new Page.WaitForSelectorOptions()
+                        .setState(WaitForSelectorState.VISIBLE)
+                        .setTimeout(10000));
+
+        return new PaymentPage(page);
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\components\TeacherPopup.java ===
+package pages.components;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
+
+public class TeacherPopup {
+
+    private final Locator popup;
+    private final Locator activeTeacher;
+    private final Locator nextButton;
+    private final Locator previousButton;
+    private final Locator closeButton;
+
+    @Inject
+    public TeacherPopup(Page page) {
+        this.popup = page.locator(
+                "div.sc-13monb3-2.sc-1craaz7-0:has(button.sc-15oy5d9-0):visible"
+        ).first();
+
+        this.activeTeacher = popup
+                .locator(".swiper-slide-active")
+                .locator("h3.sc-1x9oq14-0.jmLQpp");
+
+        this.nextButton = popup.locator(
+                "button.sc-az0z8y-0.sc-az0z8y-5"
+        );
+
+        this.previousButton = popup.locator(
+                "button.sc-az0z8y-0.sc-az0z8y-4"
+        );
+
+        this.closeButton = popup.locator(
+                "button.sc-15oy5d9-0"
+        );
+    }
+
+    public void waitForOpen() {
+        popup.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+    }
+
+    public boolean isOpen() {
+        return popup.isVisible();
+    }
+
+    public String getTeacherName() {
+        activeTeacher.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+
+        return activeTeacher.innerText().trim();
+    }
+
+    public void clickNext() {
+        nextButton.click();
+
+        waitForTeacherChange();
+    }
+
+    public void clickPrevious() {
+        previousButton.click();
+
+        waitForTeacherChange();
+    }
+
+    public void close() {
+        closeButton.click();
+
+        popup.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.HIDDEN)
+                .setTimeout(15_000));
+    }
+
+    private void waitForTeacherChange() {
+        pageWaitForPopupContent();
+    }
+
+    private void pageWaitForPopupContent() {
+        activeTeacher.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\main\java\pages\components\TeachersComponent.java ===
+package pages.components;
+
+import com.google.inject.Inject;
+import com.microsoft.playwright.Locator;
+import com.microsoft.playwright.Mouse;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.WaitForSelectorState;
+
+public class TeachersComponent {
+
+    private final Page page;
+    private final Locator section;
+    private final Locator slider;
+    private final Locator teachers;
+
+    @Inject
+    public TeachersComponent(Page page) {
+        this.page = page;
+
+        this.section = page.locator("section")
+                .filter(new Locator.FilterOptions()
+                        .setHasText("Преподаватели"))
+                .first();
+
+        this.slider = section.locator(".swiper").first();
+
+        this.teachers = section.locator(".swiper-slide");
+    }
+
+    public boolean isDisplayed() {
+        return section.isVisible();
+    }
+
+    public int getTeachersCount() {
+        return teachers.count();
+    }
+
+    public boolean hasTeacher(String teacherName) {
+        return teachers
+                .filter(new Locator.FilterOptions()
+                        .setHasText(teacherName))
+                .count() > 0;
+    }
+
+    public String getTeacherName(int index) {
+        return teachers.nth(index)
+                .locator("p")
+                .first()
+                .innerText()
+                .trim();
+    }
+
+    public String getTeacherPosition(String teacherName) {
+        return findTeacher(teacherName)
+                .locator("p")
+                .nth(1)
+                .innerText()
+                .trim();
+    }
+
+    public void dragToNextTeacher() {
+        slider.scrollIntoViewIfNeeded();
+
+        Locator activeSlide = section.locator(".swiper-slide-active");
+
+        activeSlide.waitFor(new Locator.WaitForOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+
+        double startX = activeSlide.boundingBox().x + activeSlide.boundingBox().width / 2;
+        double startY = activeSlide.boundingBox().y + activeSlide.boundingBox().height / 2;
+
+        page.mouse().move(startX, startY);
+        page.mouse().down();
+
+        page.mouse().move(startX - 350, startY, new Mouse.MoveOptions().setSteps(10));
+
+        page.mouse().up();
+
+        page.waitForTimeout(500);
+    }
+
+    public int getActiveSlideIndex() {
+        String index = section.locator(".swiper-slide-active")
+                .getAttribute("data-swiper-slide-index");
+
+        if (index == null) {
+            throw new IllegalStateException("У активного слайда отсутствует data-swiper-slide-index");
+        }
+
+        return Integer.parseInt(index);
+    }
+
+    public String getActiveTeacherName() {
+        return section.locator(".swiper-slide-active")
+                .locator("p")
+                .first()
+                .innerText()
+                .trim();
+    }
+
+    public boolean hasActiveSlideChanged(int previousIndex) {
+        return getActiveSlideIndex() != previousIndex;
+    }
+
+    public void clickTeacher(String teacherName) {
+        findTeacher(teacherName).click();
+        page.locator("div.sc-13monb3-2.sc-1craaz7-0:has(button.sc-15oy5d9-0):visible")
+                .first()
+                .waitFor(new Locator.WaitForOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(15_000));
+    }
+
+    private Locator findTeacher(String teacherName) {
+        return teachers.filter(new Locator.FilterOptions().setHasText(teacherName)).first();
+    }
+}
+
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\test\java\tests\Scenario1Test.java ===
+package tests;
+
+import com.google.inject.Inject;
+import extensions.PlaywrightExtension;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import pages.ClickHousePage;
+import pages.components.TeacherPopup;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@ExtendWith(PlaywrightExtension.class)
+class Scenario1Test {
+
+    @Inject
+    private ClickHousePage clickHousePage;
+
+    @Test
+    void shouldScrollTeachersAndVerifyTeacherPopup() {
+        clickHousePage.open();
+
+        assertTrue(clickHousePage.teachers().isDisplayed(), "Секция 'Преподаватели' не отображается");
+
+        assertTrue(clickHousePage.teachers().getTeachersCount() > 0, "В секции 'Преподаватели' нет преподавателей");
+
+        int previousIndex = clickHousePage.teachers().getActiveSlideIndex();
+
+        clickHousePage.teachers().dragToNextTeacher();
+
+        assertTrue(clickHousePage.teachers().hasActiveSlideChanged(previousIndex), "Список преподавателей не прокрутился после drag");
+
+        String activeTeacherName = clickHousePage.teachers().getActiveTeacherName();
+
+        clickHousePage.teachers().clickTeacher(activeTeacherName);
+
+        TeacherPopup popup = clickHousePage.popup();
+
+        popup.waitForOpen();
+
+        assertEquals(activeTeacherName, popup.getTeacherName(), "Открыт popup другого преподавателя");
+
+        String firstPopupTeacherName = popup.getTeacherName();
+
+        popup.clickNext();
+
+        String secondPopupTeacherName = popup.getTeacherName();
+
+        assertNotEquals(firstPopupTeacherName, secondPopupTeacherName, "После нажатия '>' преподаватель не изменился");
+
+        popup.clickPrevious();
+
+        assertEquals(firstPopupTeacherName, popup.getTeacherName(), "После нажатия '<' не открылся предыдущий преподаватель");
+
+        popup.close();
+
+        assertFalse(popup.isOpen(), "Popup не закрылся");
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\test\java\tests\Scenario2Test.java ===
+package tests;
+
+import com.google.inject.Inject;
+import extensions.PlaywrightExtension;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import pages.CatalogPage;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+@ExtendWith(PlaywrightExtension.class)
+public class Scenario2Test {
+
+    @Inject
+    private CatalogPage catalogPage;
+
+    @Test
+    void shouldFilterCoursesByDurationAndDirection() {
+
+        catalogPage.open();
+
+        catalogPage.verifyDefaultFilters();
+
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "В каталоге отсутствуют курсы");
+
+        catalogPage.selectDuration(3, 10);
+
+        catalogPage.verifyAllCoursesDurationInRange(3, 10);
+
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После фильтра по продолжительности каталог пуст");
+
+        catalogPage.selectArchitectureDirection();
+
+        catalogPage.verifyDirectionFilterArchitecture();
+
+        catalogPage.verifyAllCoursesDurationInRange(3, 10);
+
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После применения двух фильтров каталог пуст");
+
+        catalogPage.resetFilters();
+
+        catalogPage.verifyFiltersReset();
+
+        assertFalse(catalogPage.getCourseCardsIds().isEmpty(), "После сброса фильтров каталог пуст"
+        );
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\test\java\tests\Scenario3Test.java ===
+package tests;
+
+import com.google.inject.Inject;
+import extensions.PlaywrightExtension;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import pages.BusinessPage;
+import pages.CatalogPage;
+
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+
+@ExtendWith(PlaywrightExtension.class)
+public class Scenario3Test {
+
+    @Inject
+    private BusinessPage businessPage;
+
+    @Test
+    void shouldOpenBusinessPageAndNavigateToCatalogAndCheckAllDirectionsFilter() {
+        // 1. Открыть страницу /b2b
+        businessPage.open();
+
+        // 2. Кликнуть по ссылке "Каталог курсов" и перейти в каталог
+        CatalogPage catalogPage = businessPage.clickCatalogLink();
+
+        // 3. Проверить, что в фильтре направления выбрано "Все направления"
+        assertThat(catalogPage.getDirectionFilterValue()).hasText("Все направления");
+        System.out.println("Фильтр 'Все направления' выбран");
+    }
+}
+=== C:\Users\Влад\IdeaProjects\otus-playwright-hw\src\test\java\tests\Scenario4Test.java ===
+package tests;
+
+import com.google.inject.Inject;
+import extensions.PlaywrightExtension;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import pages.PaymentPage;
+import pages.SubscriptionPage;
+
+@ExtendWith(PlaywrightExtension.class)
+public class Scenario4Test {
+
+    @Inject
+    private SubscriptionPage subscriptionPage;
+
+    @Test
+    void shouldVerifySubscriptionOptionsAndPayment() {
+        subscriptionPage.open();
+
+        subscriptionPage.verifySubscriptionCardsDisplayed();
+        System.out.println("Варианты подписки отображаются");
+
+        subscriptionPage.clickDetailsButton();
+        subscriptionPage.verifyDescriptionExpanded();
+        System.out.println("Описание развернуто");
+
+        subscriptionPage.clickDetailsButton();
+        subscriptionPage.verifyDescriptionCollapsed();
+        System.out.println("Описание свернуто");
+
+        PaymentPage paymentPage = subscriptionPage.clickBuyButton();
+        System.out.println("Переход на страницу оплаты (модальное окно)");
+
+        paymentPage.verifyPaymentPageOpened();
+        System.out.println("Модальное окно открыто");
+
+        paymentPage.closeAuthModal();
+        System.out.println("Модальное окно закрыто");
+    }
+}
